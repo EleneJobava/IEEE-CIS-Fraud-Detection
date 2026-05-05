@@ -127,53 +127,114 @@ top 200 importance feature-ები ოდნავ უკეთეს val AUC-
 ---
 
 ## Training
-ამ პროექტში 5 სხვადასხვა არქიტექტურა გავტესტე:
+
+### ტესტირებული მოდელები
+
+ამ პროექტში ხუთი სხვადასხვა არქიტექტურა გავტესტე — თითოეულს ცალკე notebook გაუკეთდა და MLflow-ზე ცალკე experiment ჩაეწერა:
+
+| მოდელი | notebook | რას აფასებს |
+|--------|----------|--------------|
+| Logistic Regression | `model_experiment_logistic_regression.ipynb` | linear baseline, რამდენად მარტივია non-linear pattern-ების დაჭერა |
+| Decision Tree | `model_experiment_DecisionTree.ipynb` | ერთი ხის overfit/underfit სიმძლავრე |
+| Random Forest | `model_experiment_random_forest.ipynb` | bagging variance შემცირება |
+| XGBoost | `model_experiment_xgboost.ipynb` | gradient boosting + regularization |
+| LightGBM | `model_experiment_light_gbm.ipynb` | leaf-wise boosting, native categorical |
 
 **Logistic Regression** — linear baseline. ეს dataset non-linear interactions-ით სავსეა (V*, C*, D* feature groups ასობით სვეტით), ამიტომ linear მოდელი შეზღუდულია. ის სასარგებლოა ქვედა ზღვარის დასადგენად — ყველა tree-based მოდელი ამაზე კარგი უნდა იყოს.
 
-**Decision Tree** — ყველაზე მარტივი tree-based მოდელი. unlimited depth-ზე train AUC → 1.0 (training data-ს ზეპირად სწავლობს), მაგრამ val AUC ensemble-ზე სუსტია. აქ გამოჩნდა ტიპური Overfitting-ის მაგალითი. შეუზღუდავი სიღრმის პირობებში Train AUC გახდა 1.0, ხოლო ვალიდაცია 0.65-ზე ჩამოვიდა. სიღრმის შეზღუდვამ (max_depth=15) და min_samples_leaf-ის გაზრდამ შედეგი გააუმჯობესა 0.84-მდე.
+**Decision Tree** — ყველაზე მარტივი tree-based მოდელი. unlimited depth-ზე train AUC → 1.0 (training data-ს ზეპირად სწავლობს), მაგრამ val AUC ensemble-ზე სუსტია. აქ გამოჩნდა ტიპური overfitting-ის მაგალითი: შეუზღუდავი სიღრმის პირობებში Train AUC 1.0-ს უახლოვდებოდა, ხოლო ვალიდაცია იკლებდა. სიღრმის შეზღუდვამ (`max_depth=15`) და `min_samples_leaf`-ის გაზრდამ შედეგი დაახლოებით 0.84 val AUC-მდე გააუმჯობესა.
 
-**Random Forest** — Decision Tree-ების bagging. თითოეული ხე სხვადასხვა bootstrap sample-სა და random feature subset-ზე ტრენინგდება. ეს variance-ს ამცირებს, overfit gap Decision Tree-ზე მნიშვნელოვნად ნაკლებია. ბაგინგის წყალობით, ამ მოდელმა ბევრად უკეთ მოახდინა ვარიაციის შემცირება, ვიდრე ერთმა ხემ, თუმცა მაინც ჩამორჩა Boosting მოდელებს.
+**Random Forest** — Decision Tree-ების bagging. თითოეული ხე სხვადასხვა bootstrap sample-სა და random feature subset-ზე ტრენინგდება. ეს variance-ს ამცირებს, overfit gap Decision Tree-ზე მნიშვნელოვნად ნაკლებია. ბაგინგის წყალობით, ვარიაციის შემცირება ერთ ხეზე უკეთ გამოვიდა, თუმცა boost-მა საბოლოო val AUC-ში მაინც უკეთესი შედეგები აჩვენა.
 
 **XGBoost** — gradient boosting: ხეები სერიულად ვარჯიშობს, თითოეული წინამორბედის residuals-ს ასწორებს. L1/L2 regularization-ი ხელს უშლის overfitting-ს.
 
-**LightGBM** — histogram-based gradient boosting. XGBoost-ზე სწრაფია (histogram approximation) და leaf-wise ზრდა level-wise-ზე გაცილებით კომპლექსურ interactions-ს სწავლობს. native `category` dtype handling-ი სხვა encoding-ს შეცვლის. LightGBM-მა აჩვენა საუკეთესო ბალანსი სისწრაფესა და სიზუსტეს შორის. ჰიპერპარამეტრების ოპტიმიზაციისას (num_leaves, reg_lambda)  ვალიდაცია იყო 0.92+ AUC.
+**LightGBM** — histogram-based gradient boosting. XGBoost-ზე სწრაფია (histogram approximation) და leaf-wise ზრდა level-wise-ზე გაცილებით კომპლექსურ interactions-ს სწავლობს. native `category` dtype handling-ი სხვა encoding-ს ნაწილობრივ ცვლის. ჰიპერპარამეტრების ოპტიმიზაციისას (`num_leaves`, `reg_lambda`) validation AUC აღმატებული იყო (საბოლოო რიცხვები MLflow run-ებს უნდა ემთხვეოდეს).
 
 ### Underfit / Overfit ანალიზი
-ყველა მოდელისთვის მიზანმიმართულად underfit და overfit კონფიგურაციები გავტესტე. ეს ადასტურებს, რომ tuning-ი სწორ სივრცეში ხდება. ასევე, ეს experiment-ები ქმნის data-driven narrative-ს preprocessing-ის ეფექტების შესახებ. 
 
-**XGBoost — underfit → tuned → overfit:**
-deeper_overfit მოდელი (max_depth=8, min_child_weight=1) ყველაზე მაღალ raw val AUC-ს (0.9018) იძლევა, მაგრამ gap=0.0873 - training data-ს ზეპირად დაისწავლა. Kaggle-ზე private leaderboard-ზე ეს მოდელი ახალ pattern-ებს ვერ დაიჭერს. regularized კონფიგი (n_estimators=250, max_depth=4, min_child_weight=5, reg_alpha=0.1, reg_lambda=2.0) val_auc=0.8918, gap=0.0236 — ეს ბევრად სტაბილური generalization-ია.
+ყველა მოდელისთვის მიზანმიმართულად underfit და overfit კონფიგურაციები გავტესტე. ეს ადასტურებს, რომ tuning-ი სწორ სივრცეში ხდება და experiment-ები ქმნის data-driven აღწერას preprocessing-ის ეფექტზე.
 
-**Logistic Regression — C (inverse regularization) ეფექტი:**
+**XGBoost — shallow → tuned → deep (overfit):** `deeper_overfit` კონფიგურაცია (`max_depth=8`, `min_child_weight=1`) ყველაზე მაღალ raw val AUC-ს (0.9018) იძლევა, მაგრამ `overfit_gap` ≈ 0.0873 — ეს training noise-ის ზეპირად სწავლის ნიშანია და private test-ზე ხშირად იშლება. `regularized` კონფიგურაცია (`n_estimators=250`, `max_depth=4`, `min_child_weight=5`, `reg_alpha=0.1`, `reg_lambda=2.0`) იძლევა val AUC ≈ **0.8918** და gap ≈ **0.0236** — ბევრად სტაბილური generalization.
+
+**Logistic Regression — C (inverse regularization):**
+
 | C | Train AUC | Val AUC | Gap | შეფასება |
 |---|-----------|---------|-----|----------|
 | 0.0001 (strong regularization) | 0.8632 | 0.8304 | 0.0328 | underfit |
 | **0.1 (tuned)** | **0.8733** | **0.8311** | **0.0422** | ✓ საუკეთესო |
 | 1000 (weak regularization) | 0.8738 | 0.8305 | 0.0433 | marginally worse |
 
-საინტერესო დაკვირვება: C=1000-ზე (minimal regularization) gap=0.0433 — მხოლოდ 0.011-ით მეტია ვიდრე C=0.1. ეს ნიშნავს, რომ Logistic Regression-ს "capacity ceiling" აქვს — მას შეუძლია 395 feature-ის წრფივი კომბინაცია, მაგრამ V*, C*, D* feature-ების non-linear interactions-ს ვერ სწავლობს.
+C მაღალი მნიშვნელობაზეც gap დიდად არ იზრდება — ეს LR-ის „capacity ceiling"-ია: მოდელი ვერ იჭერს V*, C*, D* non-linear interactions-ს მაქსიმუმამდე, ამიტომ train/val სიახლოვეს რჩება.
 
-### Hyperparameter Tuning — გამოყენებული სტრატეგიები
+### Hyperparameter ოპტიმიზაციის მიდგომა
 
-ყველა მოდელისთვის manual grid search გამოვიყენე. ავტომატური optimization (Optuna, Hyperopt) არ გამომიყენებია manual search უფრო ნათლად ასახავს თითოეული პარამეტრის ეფექტს.
+ყველა მოდელისთვის **manual grid search** გამოვიყენე — პარამეტრების უბნები წინასწარ განვსაზღვრე და ყველა კომბინაცია val AUC + `overfit_gap`-ით შევისანხლე. ეს მიდგომა უფრო გამჭვირვალეა ვიდრე „შავი ყავხანი“ bayesian search — პირდაპირ ჩანს, რომელი პარამეტრი რას აკეთებს და რატომ შეირჩა საბოლოო სეტი. Optuna/Hyperopt არ გამოვიყენე, რათა თითოეული run-ის ინტერპრეტაცია დავამსიხველო და დავალოგო MLflow-ზე.
 
-- **XGBoost:** `max_depth` (4–8), `min_child_weight` (1–10), `reg_alpha` (0–0.5), `reg_lambda` (1–5) — სულ ~10 run
-- **Random Forest:** `max_depth` (10, 15, 20), `min_samples_leaf` (10, 50) — 6 run, დამატებით underfit/overfit
-- **LightGBM:** `num_leaves` (31, 63, 127), `min_child_samples` (20, 100), `reg_lambda` (0, 1) — 12 run. early stopping n_estimators-ს თვითონ ირჩევს val set-ზე, ამიტომ n_estimators ცალკე არ ოპტიმიზირდება
-- **Decision Tree:** `max_depth` (5–20), `min_samples_leaf` (10–200) — 12 run
+- **XGBoost:** `max_depth`, `min_child_weight`, `reg_alpha`, `reg_lambda`, `learning_rate`, `n_estimators` — underfit/overfit კონფიგებთან ერთად.
+- **Random Forest:** `max_depth` × `min_samples_leaf` grid (დამატებით shallow/deep sanity checks).
+- **LightGBM:** `num_leaves`, `min_child_samples`, `reg_lambda`; `n_estimators` ეტაპობრივად early stopping-ით val set-ზე.
+- **Decision Tree:** `max_depth` × `min_samples_leaf` — ცალკე უსასრულო სიღრმის overfit run-იც.
+- **Logistic Regression:** `C` grid + `StandardScaler` pipeline-ში; `class_weight='balanced'`.
+
+ყველა tuning run-ში საბოლოო არჩევა ხდებოდა არა მხოლოდ მაღალი val AUC-ით, არამედ **განმეორებადობით** — თუ gap > 0.05, მოდელი პრაქტიკულად უარყოფილი იყო submission-ისთვის, თუნდაც raw val უფრო მაღალი ჩანდა.
 
 ### Cross-Validation
-ყველა მოდელისთვის TimeSeriesSplit cross-validation ჩავატარე. ეს Kaggle-ის standard k-fold-ზე უკეთესია fraud detection-ისთვის — k-fold-ი ისტორიული მონაცემებით "მომავალს ისწავლის", რაც data leakage-ია. TimeSeriesSplit-ი ყოველთვის წარსულ ინფორმაციაზე ასწავლის და მომავალ fold-ზე ახდენს ვალიდაციას.
 
-# საბოლოო მოდელის შერჩევა
+ყველა მოდელისთვის `TimeSeriesSplit` cross-validation ჩავატარე. სტანდარტული k-fold fraud time-series-ზე leakage-ს იწვევს — future rows შეიძლება „წარსულში" მოხვდეს training-ში. `TimeSeriesSplit` ყოველთვის წარსულზე ასწავლის და მომავალ period-ზე ავალიდაციობს.
 
-`model_inference.ipynb` ავტომატურად ადარებს ყველა registered model-ს MLflow Registry-დან. გამარჯვებული ყველაზე მაღალი val AUC-ით შეირჩევა (gap > 0.05 penalty-ს გამოიწვევს). შემდეგ სრულ training set-ზე (train + val გაერთიანება) დავატრენინგე ეს ~20%-ით მეტ data-ს ნიშნავს Kaggle submission-ისთვის.
+XGBoost-ისთვის (მაგალითად 3-fold) CV mean val AUC ≈ **0.8841**, std ≈ **0.0042** — დაბალი std მიუთითებს სტაბილურობაზე სხვადასხვა ქრონოლოგიურ ფანჯარაზე.
 
-<img src="images/model_comparison.png" width="400"/>
+---
+
+### საბოლოო მოდელის შერჩევა
+
+საბოლოო მოდელი **არ** ირჩევა მხოლოდ ერთი მაღალი val AUC-ით. მიზანია **გენერალიზაცია + სტაბილურობა**:
+
+1. **Val AUC** — ძირითადი მეტრიკა time-based split-ზე (80/20 `TransactionDT` მიხედვით).
+2. **`overfit_gap` (`train_auc − val_auc`)** — დიდი gap ნიშნავს, რომ მოდელი training-ს noise-ს სწავლობს; ასეთი კონფიგურაცია Kaggle private-ზე ხშირად იშლება.
+3. **CV (`TimeSeriesSplit`)** — თუ val AUC კარგია, მაგრამ fold-ებს შორის დიდი რყევაა, მოდელი „ერთ პერიოდზე"ა overfit-ირებული.
+4. **Pipeline + Registry** — გამარჯვებული მოდელი ინახება `sklearn.pipeline.Pipeline`-ად, რათა test-ზე იგივე preprocessing განმეორდეს.
+
+ამ ლოგიკით XGBoost-ის **`regularized`** კონფიგურაცია (არა `deeper_overfit`) არის პრაქტიკული „production" არჩევანი: val AUC მაღალია, gap კონტროლირებადია, CV სტაბილურია. თუ `model_inference.ipynb` სხვა registered მოდელს (მაგ. LightGBM) უფრო მაღალი val AUC აქვს და gap საღებადია, ის აირჩევა ავტომატურად — README-ში რიცხვები უნდა განახლდეს იმ run-ის მიხედვით, რაც Registry-ში ბოლოა.
+
+---
+
+## საუკეთესო მოდელის შედეგები
+
+ქვემოთ ცხრილი ასახავს Model Registry-ში დარეგისტრირებულ Pipeline-ების **validation AUC**-ს იმ run-იდან, რომელმაც ბოლო ვერსია შექმნა. სრული submission-ისთვის `model_inference.ipynb` ირჩევს ყველაზე მაღალ val AUC-ს და **სრულ training set-ზე** (train + val) ხელახლა ტრენინგდება — ეს დაახლოებით 20%-ით მეტ მონაცემს იძლევა.
+
+| Registry name | არქიტექტურა | Val AUC (დარეგისტრირების run) |
+|---------------|-------------|--------------------------------|
+| `IEEE_CIS_XGBoost_Best` | XGBoost (regularized) | **0.8918** |
+| `IEEE_CIS_LogisticRegression_Best` | Logistic Regression | **0.8317** |
+| `IEEE_CIS_LightGBM_Best` | LightGBM | შეავსე MLflow-დან |
+| `IEEE_CIS_RandomForest_Best` | Random Forest | შეავსე MLflow-დან |
+| `IEEE_CIS_DecisionTree_Best` | Decision Tree | შეავსე MLflow-დან |
+
+<img src="images/model_comparison.png" width="700"/>
+
+*დიაგრამა `model_inference.ipynb`-ის გაშვების შემდეგ იგენერირება (`images/model_comparison.png`) — იქ ყველა registered მოდელის val AUC ერთ გრაფიკზეა.*
+
+---
 
 ## MLflow Tracking
-ექსპერიმენტების ბმული
+
+**ექსპერიმენტების ბმული (DagsHub + MLflow):**  
 https://dagshub.com/ejoba22/IEEE-CIS-Fraud-Detection
 
-MLflow-ში ყველა მოდელის არქიტექტურა ცალკე experiment-ადაა ორგანიზებული. თითოეული experiment-ის შიგნით run-ები pipeline-ის ეტაპებს შეესაბამება: cleaning, feature engineering, feature selection, training, cross-validation, final pipeline. ეს სტრუქტურა ნებისმიერ გადაწყვეტილებას ასახავს - რატომ შეირჩა ეს threshold, ეს feature set, ეს hyperparameter.
+MLflow-ში ყველა მოდელის არქიტექტურა ცალკე **experiment**-ადაა ორგანიზებული. თითოეული experiment-ის შიგნით **run**-ები pipeline-ის ეტაპებს შეესაბამება: cleaning, feature engineering, feature selection, training, cross-validation, final pipeline. ეს სტრუქტურა ნებისმიერ გადაწყვეტილებას ასახავს — რატომ შეირჩა ეს threshold, ეს feature set, ეს hyperparameter.
+
+### ჩაწერილი მეტრიკების აღწერა
+
+ყველა run-ში (სადაც შესაბამისი იყო) ლოგდება **პარამეტრები** (`mlflow.log_param`) და **მეტრიკები** (`mlflow.log_metric`). ძირითადი მეტრიკების ინტერპრეტაცია:
+
+| მეტრიკა | რას ნიშნავს | როგორ გამოვიყენოთ |
+|---------|-------------|-------------------|
+| `train_auc` | ROC-AUC training subset-ზე (time split-ის train ნაწილი) | მაღალი train + დაბალი val → overfit |
+| `val_auc` | ROC-AUC validation subset-ზე (time split-ის უკანა 20%) | **მთავარი შედარების მეტრიკა** tuning-ისთვის |
+| `overfit_gap` | `train_auc − val_auc` | რაც უფრო დიდია, მით ნაკლებად trustworthyა generalization |
+| `cv_auc_mean` / `cv_mean_auc` | `TimeSeriesSplit` fold-ების საშუალო val AUC | სტაბილურობა სხვადასხვა ქრონოლოგიურ ფანჯარაზე |
+| `cv_auc_std` / `cv_std_auc` | fold-ების სტანდარტული გადახრა | დაბალი std → მოდელი არ არის „ერთ დღეზე" overfit-ირებული |
+| `cv_fold_N_auc` | ცალკეული fold-ის AUC | სად „იშლება" მოდელი — ადრეულ vs გვიან პერიოდზე |
+| `selection_score` | ზოგ notebook-ში: val AUC მინусი penalty დიდი gap-ისთვის | conservative არჩევანი overfit-ის წინააღმდეგ |
+| `best_iteration` | LightGBM early stopping-ის იტერაცია | რამდენი boosting round საჭირო იყო |
