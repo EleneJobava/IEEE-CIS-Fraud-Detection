@@ -161,7 +161,7 @@ top 200 importance feature-ები ოდნავ უკეთეს val AUC-
 | C | Train AUC | Val AUC | Gap | შეფასება |
 |---|-----------|---------|-----|----------|
 | 0.0001 (strong regularization) | 0.8632 | 0.8304 | 0.0328 | underfit |
-| **0.1 (tuned)** | **0.8733** | **0.8311** | **0.0422** | ✓ საუკეთესო |
+| **0.1 (tuned)** | **0.8733** | **0.8311** | **0.0422** | საუკეთესო |
 | 1000 (weak regularization) | 0.8738 | 0.8305 | 0.0433 | marginally worse |
 
 C მაღალი მნიშვნელობაზეც gap დიდად არ იზრდება — ეს LR-ის „capacity ceiling"-ია: მოდელი ვერ იჭერს V*, C*, D* non-linear interactions-ს მაქსიმუმამდე, ამიტომ train/val სიახლოვეს რჩება.
