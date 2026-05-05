@@ -225,16 +225,5 @@ https://dagshub.com/ejoba22/IEEE-CIS-Fraud-Detection
 MLflow-ში ყველა მოდელის არქიტექტურა ცალკე **experiment**-ადაა ორგანიზებული. თითოეული experiment-ის შიგნით **run**-ები pipeline-ის ეტაპებს შეესაბამება: cleaning, feature engineering, feature selection, training, cross-validation, final pipeline. ეს სტრუქტურა ნებისმიერ გადაწყვეტილებას ასახავს — რატომ შეირჩა ეს threshold, ეს feature set, ეს hyperparameter.
 
 ### ჩაწერილი მეტრიკების აღწერა
+ექსპერიმენტების შეფასებისას რამდენიმე საკვანძო მეტრიკას ვეყრდნობოდი. train_auc და val_auc გვიჩვენებდა მოდელის ათვისების ხარისხს, ხოლო overfit_gap (სხვაობა მათ შორის) წარმოაჩენდა, რამდენად სანდო იქნებოდა მოდელი რეალურ ტესტ სეტზე. cv_auc_mean და cv_auc_std გვეხმარება იმის გაგებაში, თუ რამდენად მდგრადია მოდელი დროის სხვადასხვა პერიოდის მიმართ. ზოგიერთ ნოუთბუქში გამოყენებული selection_score კი საშუალებას გვაძლევდა, გაგვეკეთებინა კონსერვატიული არჩევანი და პრიორიტეტი მიგვენიჭებინა იმ მოდელებისთვის, რომლებსაც მაღალ სიზუსტესთან ერთად დაბალი Overfitting-ის რისკი ჰქონდათ.
 
-ყველა run-ში (სადაც შესაბამისი იყო) ლოგდება **პარამეტრები** (`mlflow.log_param`) და **მეტრიკები** (`mlflow.log_metric`). ძირითადი მეტრიკების ინტერპრეტაცია:
-
-| მეტრიკა | რას ნიშნავს | როგორ გამოვიყენოთ |
-|---------|-------------|-------------------|
-| `train_auc` | ROC-AUC training subset-ზე (time split-ის train ნაწილი) | მაღალი train + დაბალი val → overfit |
-| `val_auc` | ROC-AUC validation subset-ზე (time split-ის უკანა 20%) | **მთავარი შედარების მეტრიკა** tuning-ისთვის |
-| `overfit_gap` | `train_auc − val_auc` | რაც უფრო დიდია, მით ნაკლებად trustworthyა generalization |
-| `cv_auc_mean` / `cv_mean_auc` | `TimeSeriesSplit` fold-ების საშუალო val AUC | სტაბილურობა სხვადასხვა ქრონოლოგიურ ფანჯარაზე |
-| `cv_auc_std` / `cv_std_auc` | fold-ების სტანდარტული გადახრა | დაბალი std → მოდელი არ არის „ერთ დღეზე" overfit-ირებული |
-| `cv_fold_N_auc` | ცალკეული fold-ის AUC | სად „იშლება" მოდელი — ადრეულ vs გვიან პერიოდზე |
-| `selection_score` | ზოგ notebook-ში: val AUC მინусი penalty დიდი gap-ისთვის | conservative არჩევანი overfit-ის წინააღმდეგ |
-| `best_iteration` | LightGBM early stopping-ის იტერაცია | რამდენი boosting round საჭირო იყო |
