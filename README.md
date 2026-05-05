@@ -7,11 +7,7 @@
 
 ## ჩემი მიდგომა
 
-1. **Time-based split** — ვალიდაციისთვის ქრონოლოგიური გაყოფა (80/20), რადგან ეს fraud detection-ის რეალობას ასახავს
-2. **MLflow + DagsHub** — ყველა ექსპერიმენტის, ჰიპერპარამეტრის და მეტრიკის ავტომატური ლოგვა
-3. **Pipeline-ად შენახვა** — საბოლოო მოდელი raw test set-ზე პირდაპირ გაეშვება preprocessing-ის გარეშე
-4. **Overfit/Underfit ანალიზი** — სხვადასხვა კონფიგურაციის შედარება, არა მხოლოდ საუკეთესო score-ის ძებნა
-5. **სრული training set-ზე გადაწვრთნა** — ექსპერიმენტების შემდეგ final submission pipeline სრულ training data-ზე რეფიტდება
+პრობლემის გადასაჭრელად გამოვიყენე იერარქიული ექსპერიმენტული მიდგომა. იმის ნაცვლად, რომ პირდაპირ მოდელის training-ზე გადავსულიყავი, თითოეული არქიტექტურისთვის ცალკე ვაფასებდი cleaning სტრატეგიას და ფიჩერების გენერირების ეფექტურობას. ვალიდაციისთვის გამოვიყენე ქრონოლოგიური სპლიტი (Time-based split), რადგან Fraud Detection-ში მომავლის პროგნოზირება წარსულ მონაცემებზე დაყრდნობით უფრო რეალისტურია, ვიდრე შემთხვევითი შერჩევა.
 
 ---
 
@@ -19,11 +15,13 @@
 
 IEEE-CIS-Fraud-Detection:
 - eda-and-observations.ipynb: მონაცემთა წინასწარი ანალიზი, ვიზუალიზაცია და კორელაციების დადგენა
-- model_experiment_LightGBM.ipynb          # LightGBM ექსპერიმენტები
-- model_experiment_xgboost.ipynb           # XGBoost ექსპერიმენტები
-- model_experiment_random_forest.ipynb     # Random Forest ექსპერიმენტები
-- model_experiment_logistic_regression.ipynb  # Logistic Regression ექსპერიმენტები
-- model_inference.ipynb                    # საუკეთესო მოდელის inference + submission
+- model_experiment_xgboost.ipynb    # XGBoost ექსპერიმენტები
+- model_experiment_random_forest.ipynb Random Forest bagging ensemble
+- model_experiment_logistic_regression.ipynb  # Logistic Regression 
+ექსპერიმენტები
+- model_experiment_light_gbm.ipynb histogram-based gradient boosting
+- model_experiment_DecisionTree.ipynb single tree baseline
+- model_inference.ipynb  საუკეთესო შედეგის მქონე მოდელის (Pipeline) ლოუდინგი Model Registry-დან და Kaggle-ისთვის საბოლოო პროგნოზების გენერირება
 
 
 ## EDA ძირითადი დაკვირვებები
@@ -52,18 +50,16 @@ email domain, ProductCD, DeviceType - fraud rate-ის მიხედვით
 
 ## Feature Engineering
 EDA-ს დაკვირვებებზე დაყრდნობით შევქმენით სხვადასხვა კატეგორიის ნიშნები
-კატეგორიული ცვლადების კოდირებისთვის სხვადასხვა მოდელში განსხვავებული მიდგომა გამოვიყენეთ, რადგან ერთი მეთოდი ყველა არქიტექტურისთვის ოპტიმალური არ არის. Logistic Regression-ში Label Encoding გამოვიყენე One-Hot Encoding-ის ნაცვლად მეხსიერების დაზოგვის მიზნით, ვინაიდან ზოგიერთ კატეგორიულ ნიშანს 50-ზე მეტი უნიკალური მნიშვნელობა ჰქონდა და OHE dimension explosion-ს გამოიწვევდა. XGBoost-სა და Random Forest-ში Ordinal Encoding გამოვიყენე, სადაც უცნობი კატეგორიები -1-ად ენიჭება.
+კატეგორიული ცვლადების კოდირებისთვის სხვადასხვა მოდელში განსხვავებული მიდგომა გამოვიყენეთ, რადგან ერთი მეთოდი ყველა არქიტექტურისთვის ოპტიმალური არ არის. Logistic Regression-ში Label Encoding გამოვიყენე One-Hot Encoding-ის ნაცვლად მეხსიერების დაზოგვის მიზნით, ვინაიდან ზოგიერთ კატეგორიულ ნიშანს 50-ზე მეტი უნიკალური მნიშვნელობა ჰქონდა და OHE dimension explosion-ს გამოიწვევდა. LightGBM-ში კატეგორიული ნიშნები native categorical-ად მიეცა, რაც ამ ფრეიმვორქის მთავარი უპირატესობაა — ის კარგად ამუშავებს კატეგორიულ ცვლადებს OHE-ს გარეშე. XGBoost-სა და Random Forest-ში Ordinal Encoding გამოვიყენე.
 
 ### კატეგორიული ცვლადების გადაყვანა
-Label Encoding: გამოყენებულ იქნა კატეგორიული ცვლადებისთვის (მაგ: ProductCD, card4, card6)
+კატეგორიული ცვლადების დამუშავება განსხვავებულად მოხდა თითოეული მოდელისთვის, რადგან ერთი მეთოდი ყველა არქიტექტურისთვის ოპტიმალური არ არის:
 
-სამი მიდგომა გატესტეს:
+**Ordinal Encoding** (Random Forest, XGBoost, Decision Tree) — ყველა უნიკალური მნიშვნელობა ენიჭება integer-ს. test set-ზე უცნობი კატეგორიები -1-ად ითვლება, რაც ხეებს საშუალებას აძლევს მათ ცალკე დაყოს. ეს მარტივი მიდგომა კარგად მუშაობს tree-based მოდელებთან, რადგან მათ შეუძლიათ arbitrary integer splits-ი.
 
-| მიდგომა | აღწერა | გამოყენება |
-|---------|--------|-----------|
-| **Ordinal Encoding** | ყველა unique მნიშვნელობა → integer | baseline და Logistic Regression |
-| **Frequency Encoding** | კატეგორია → მისი relative frequency training set-ში | `time_amount_freq` feature set |
-| **Unseen → -1** | test-ში უცნობი კატეგორია → -1 | ორივე notebook-ში |
+**Native Category dtype** (LightGBM) — pandas-ის category dtype გადაეცემა LightGBM-ს პირდაპირ. LightGBM თვითონ პოულობს ოპტიმალურ სპლიტს კატეგორიებზე ordered target statistics-ის გარეშე, რაც overfitting-ს ამცირებს. ეს LightGBM-ის ერთ-ერთი ყველაზე ძლიერი მხარეა სხვა encoding-ის საჭიროება არ არის.
+
+**Label Encoding** (Logistic Regression) — One-Hot Encoding-ის ნაცვლად გამოვიყენე, რადგან ზოგიერთ სვეტს 50-ზე მეტი უნიკალური მნიშვნელობა ჰქონდა და OHE dimension explosion-ს გამოიწვევდა (V* სვეტებთან ერთად 1000+ feature გამოდოდა). 
 
 ### NaN მნიშვნელობების დამუშავება
 
@@ -74,7 +70,11 @@ Label Encoding: გამოყენებულ იქნა კატეგ�
 | `minus999` | -999-ით შევსება (explicit missing signal) | tested |
 | `median_indicator` | median + ცალკე binary სვეტი "იყო NaN?" | tested |
 
-რადგან კვლევითმა ანალიზმა (EDA) აჩვენა, რომ 434 სვეტიდან 214-ში ინფორმაციის ნახევარზე მეტი აკლია. ლოგისტიკური რეგრესიისთვის გამოვიყენე მედიანით შევსების (Median Imputation) სტანდარტული მიდგომა, რაც წრფივი მოდელებისთვის მონაცემთა სტაბილურობის გარანტიაა. XGBoost-ის შემთხვევაში კი ჩავატარე უფრო ფართო ექსპერიმენტები, სადაც ერთმანეთს შეედარა მედიანით შევსება, მუდმივი მნიშვნელობით (-999) ჩანაცვლება და ინდიკატორული ცვლადების შექმნა, რომლებიც ცალკე სვეტად აღრიცხავენ, იყო თუ არა კონკრეტული მნიშვნელობა გამოტოვებული. ინდიკატორული ცვლადების გამოყენება განსაკუთრებით ეფექტური აღმოჩნდა, რადგან თაღლითური ტრანზაქციების დროს ხშირად გარკვეული ინფორმაცია განზრახ არის დაფარული, რაც მოდელისთვის მნიშვნელოვან სიგნალს წარმოადგენს. 
+`median_indicator` მიდგომამ ოდნავ უკეთესი შედეგი გამოიღო, რადგან ის ორ სიგნალს ინახავს: imputed მნიშვნელობასა და ინდიკატორს. LightGBM-ს NaN-ები tree splits-შივე შეუძლია გამოიყენოს, ამიტომ მას imputation-ი საჭიროდ არ ჩაითვალა.
+
+რადგან კვლევითმა ანალიზმა (EDA) აჩვენა, რომ 434 სვეტიდან 214-ში ინფორმაციის ნახევარზე მეტი აკლია. ლოგისტიკური რეგრესიისთვის გამოვიყენე მედიანით შევსების (Median Imputation) სტანდარტული მიდგომა, რაც წრფივი მოდელებისთვის მონაცემთა სტაბილურობის გარანტიაა. XGBoost-ის შემთხვევაში კი ჩავატარე უფრო ფართო ექსპერიმენტები, სადაც ერთმანეთს შევადარე მედიანით შევსება, მუდმივი მნიშვნელობით (-999) ჩანაცვლება და ინდიკატორული ცვლადების შექმნა, რომლებიც ცალკე სვეტად აღრიცხავენ, იყო თუ არა კონკრეტული მნიშვნელობა გამოტოვებული. ინდიკატორული ცვლადების გამოყენება განსაკუთრებით ეფექტური აღმოჩნდა, რადგან თაღლითური ტრანზაქციების დროს ხშირად გარკვეული ინფორმაცია განზრახ არის დაფარული, რაც მოდელისთვის მნიშვნელოვან სიგნალს წარმოადგენს. 
+
+ამის საპირისპიროდ, LightGBM-ის ექსპერიმენტში გამოვიყენე მისი "Native" შესაძლებლობა გამოტოვებული მნიშვნელობების მართვისა, რაც გამორიცხავს იმპუტაციის საჭიროებას და ამცირებს მონაცემთა ხელოვნურად დამახინჯების რისკს. წრფივი მოდელისთვის (Logistic Regression) კი NaN მნიშვნელობების მედიანით შევსება კრიტიკული აღმოჩნდა, რადგან ეს ალგორითმი ვერ მუშაობს გამოტოვებულ მონაცემებთან და მგრძნობიარეა outlier-ების მიმართ. Decision Tree-სა და Random Forest-ის ნოუთბუქებში მედიანით შევსება გახდა ბაზისური სტანდარტი, რამაც უზრუნველყო ხეების სტაბილური დაყოფა.
 
 ### Cleaning მიდგომები
 
@@ -90,26 +90,31 @@ Missing value threshold-ის შედეგები (baseline median imputat
 
 **დასკვნა:** 50% threshold-ი ოდნავ უკეთეს val AUC-ს და უფრო მცირე overfit gap-ს იძლევა. 90% threshold-ი ბევრ სვეტს ინახავს, მაგრამ ეს დამატებითი სვეტები validation-ზე ვერ გვეხმარება. ამიტომ **CHOSEN_THRESHOLD = 0.50** შეირჩა.
 
+აქ მიდგომა რადიკალურად განსხვავებული იყო. რადგან ლოგისტიკური რეგრესია ვერ მუშაობს $NaN$-ებთან, გამოვიყენე 90%-იანი ზღვარი (რომ რაც შეიძლება მეტი ინფორმაცია შეგვენარჩუნებინა) და ყველა დარჩენილი გამოტოვებული ადგილი შევავსე მედიანით.
+
+Logistic Regression: სავალდებულო გახდა StandardScaler-ს გამოყენება. ამის გარეშე მოდელი ვერ ახდენდა კონვერგირებას, რადგან TransactionAmt და C-features სხვადასხვა მასშტაბის იყო.
+
+Tree-based Models: ხეებზე დაფუძნებული მოდელებისთვის (RF, DT, XGB, LGBM) სკალირება არ გამომიყენებია, რადგან გადაწყვეტილების ხეები ინვარიანტულია მონაცემთა მონოტონური ტრანსფორმაციის მიმართ. 
+
 ---
 
 ## Feature Engineering ვარიანტები
+ყველა მოდელისთვის სამი feature set შევადარე (baseline, time_amount, model-specific):
 
-| Feature Set | Features | Train AUC | Val AUC | Gap |
-|-------------|----------|-----------|---------|-----|
-| `baseline` | 217 | 0.9098 | 0.8873 | 0.0226 |
-| `time_amount` | 222 | 0.9123 | 0.8850 | 0.0273 |
-| `time_amount_freq` | 233 | 0.9145 | 0.8859 | 0.0286 |
+TransactionAmt_log - მაღლა მეორე გრაფზე ნაჩვენებია, რომ raw TransactionAmt ძლიერ skewed არის. log-transform ნაწილობრივ ნორმალურ განაწილებას იძლევა, რაც Logistic Regression-ს ეხმარება. Tree-based მოდელები skewness-ს ისედაც უმკლავდებიან split-ების გზით, მაგრამ validation-ზე ოდნავ გაუმჯობესება მაინც შეინიშნა.
 
-`time_amount` feature set-ი ამატებს: `Transaction_hour`, `Transaction_day`, `Transaction_week`, `TransactionAmt_log`, `TransactionAmt_cents`.
+amt_x_hour - TransactionAmt_log × Transaction_hour interaction. gradient boosting ამ interaction-ს ისედაც ისწავლის მრავალი split-ით, მაგრამ Decision Tree-სთვის explicit interaction feature ეხმარება, რადგან ერთი split ორ feature-ს ერთდროულად ვერ გამოიყენებს.
 
-`time_amount_freq` ამატებს ასევე frequency encoding-ს კატეგორიულ სვეტებზე.
-
-**დასკვნა:** baseline feature set-ი validation-ზე ოდნავ უკეთესია — engineered features train-ზე უმჯობესდება, მაგრამ validation-ზე ოდნავ მეტ overfit-ს იძლევა. `BEST_FEATURE_SET = 'baseline'`.
+C*_log — C სვეტები ანგარიშის transaction count-ებია (velocity features). raw განაწილება heavy-tailed არის log-transform ამცირებს extreme outlier-ების გავლენას.
 
 ---
 
 ## Feature Selection
-წრფივი მოდელისთვის გამოვიყენე Variance Threshold მეთოდი, რომელმაც ამოაგდო ის ცვლადები, რომელთა ვარიაცია 0.01-ზე ნაკლები იყო, რადგან ასეთი სტატიკური მახასიათებლები ლოგისტიკური რეგრესიისთვის არაინფორმატიულია. XGBoost-ისთვის კი შერჩევა დაეფუძნა მოდელის შიდა Feature Importance რეიტინგებს, სადაც გაიტესტა ტოპ 100, 200 და 300 მახასიათებლის შერჩევა. ანალიზმა აჩვენა, რომ ტოპ 200 მახასიათებლის გამოყენებით მიიღწევა ყველაზე სტაბილური შედეგი და საუკეთესო ბალანსი სიზუსტესა და მოდელის სირთულეს შორის.
+პირველი მიდგომა Near-Zero Variance Threshold ყველა მოდელისთვის გამოვიყენეთ. ნიშნები, რომელთა variance 0.01-ზე ნაკლებია, პრაქტიკულად კონსტანტები არიან და მოდელს გადაწყვეტილების მიღებაში ვერ ეხმარებიან. Logistic Regression-ში ამ ფილტრმა ~15–20 სვეტი ამოაგდო, ძირითადად V-ნიშნებიდან (V1–V339), რომლებიც Vesta-ს შიდა feature-ებია და ნაწილი ნულოვანი ვარიაციის ახლოსაა.
+
+მეორე მიდგომა Correlation-based Filtering იყო XGBoost-ისა და Random Forest-ის ექსპერიმენტებში. სამიზნე ცვლადთან |კორელაცია| < 0.02 მქონე ნიშნები ამოვაგდე. ეს მიდგომა კარგია linear კავშირების გამოვლენისთვის, მაგრამ ხის მოდელებში non-linear კავშირებს ვერ ითვალისწინებს ამიტომ ეს მეთოდი შედეგებში მხოლოდ marginal გაუმჯობესებას იძლეოდა.
+
+მესამე და ყველაზე ეფექტური მიდგომა Feature Importance პრუნინგი LightGBM-ისა და XGBoost-ის ექსპერიმენტებში გამოვიყენეთ. პირველ run-ში ვამუშავეთ სრული feature set და importance-ები ვალოგეთ. შემდეგ run-ში ქვედა 20%-იანი importance-ის ნიშნები ამოვაგდეთ. ამ მიდგომამ val AUC ~0.002-ით გაზარდა LightGBM-ში, ხოლო overfit_gap შემცირდა, რაც მიუთითებს, რომ ამოვარდნილი ნიშნები ხმაურს ამატებდნენ
 
 | მეთოდი | Features | Train AUC | Val AUC | Gap |
 |--------|----------|-----------|---------|-----|
@@ -122,143 +127,41 @@ top 200 importance feature-ები ოდნავ უკეთეს val AUC-
 ---
 
 ## Training
+ამ პროექტში 5 სხვადასხვა არქიტექტურა გავტესტე:
 
-### ტესტირებული XGBoost მოდელები
+**Logistic Regression** — linear baseline. ეს dataset non-linear interactions-ით სავსეა (V*, C*, D* feature groups ასობით სვეტით), ამიტომ linear მოდელი შეზღუდულია. ის სასარგებლოა ქვედა ზღვარის დასადგენად — ყველა tree-based მოდელი ამაზე კარგი უნდა იყოს.
 
-| Config | Train AUC | Val AUC | Gap | Behavior |
-|--------|-----------|---------|-----|----------|
-| baseline | 0.9097 | 0.8874 | 0.0223 | generalization |
-| **regularized** | **0.9154** | **0.8918** | **0.0236** | generalization |
-| deeper_overfit_check | 0.9891 | 0.9018 | 0.0873 | **overfit** |
-| shallow_underfit_check | 0.8616 | 0.8491 | 0.0125 | **underfit** |
+**Decision Tree** — ყველაზე მარტივი tree-based მოდელი. unlimited depth-ზე train AUC → 1.0 (training data-ს ზეპირად სწავლობს), მაგრამ val AUC ensemble-ზე სუსტია. აქ გამოჩნდა ტიპური Overfitting-ის მაგალითი. შეუზღუდავი სიღრმის პირობებში Train AUC გახდა 1.0, ხოლო ვალიდაცია 0.65-ზე ჩამოვიდა. სიღრმის შეზღუდვამ (max_depth=15) და min_samples_leaf-ის გაზრდამ შედეგი გააუმჯობესა 0.84-მდე.
 
-**Overfit ანალიზი (`deeper_overfit_check`):**
-`max_depth=8`, `min_child_weight=1` — ძალიან ღრმა ხეები training data-ს noise-ს ზეპირად ისწავლის. train_auc=0.9891 vs val_auc=0.9018 — gap=0.0873 ამ მოდელის გამოუყენებლობაზე მეტყველებს Kaggle submission-ში.
+**Random Forest** — Decision Tree-ების bagging. თითოეული ხე სხვადასხვა bootstrap sample-სა და random feature subset-ზე ტრენინგდება. ეს variance-ს ამცირებს, overfit gap Decision Tree-ზე მნიშვნელოვნად ნაკლებია. ბაგინგის წყალობით, ამ მოდელმა ბევრად უკეთ მოახდინა ვარიაციის შემცირება, ვიდრე ერთმა ხემ, თუმცა მაინც ჩამორჩა Boosting მოდელებს.
 
-**Underfit ანალიზი (`shallow_underfit_check`):**
-`max_depth=2`, `min_child_weight=10`, `reg_lambda=5.0` — ძალიან მარტივი მოდელი, ვერ სწავლობს fraud pattern-ებს. train_auc=0.8616 val_auc=0.8491 — ორივე დაბალია.
+**XGBoost** — gradient boosting: ხეები სერიულად ვარჯიშობს, თითოეული წინამორბედის residuals-ს ასწორებს. L1/L2 regularization-ი ხელს უშლის overfitting-ს.
 
-**Hyperparameter ოპტიმიზაციის მიდგომა:**
-Manual grid search: სხვადასხვა `max_depth`, `learning_rate`, `n_estimators`, `min_child_weight`, `reg_alpha`, `reg_lambda` კომბინაციები. Final model შეირჩა conservative selection score-ით: `val_auc - penalty(gap > 0.05)`.
+**LightGBM** — histogram-based gradient boosting. XGBoost-ზე სწრაფია (histogram approximation) და leaf-wise ზრდა level-wise-ზე გაცილებით კომპლექსურ interactions-ს სწავლობს. native `category` dtype handling-ი სხვა encoding-ს შეცვლის. LightGBM-მა აჩვენა საუკეთესო ბალანსი სისწრაფესა და სიზუსტეს შორის. ჰიპერპარამეტრების ოპტიმიზაციისას (num_leaves, reg_lambda)  ვალიდაცია იყო 0.92+ AUC.
 
-**საბოლოო მოდელის შერჩევის დასაბუთება:**
-`deeper_overfit_check`-ს უმაღლესი raw val_auc (0.9018) აქვს, მაგრამ gap=0.0873 ძლიერი overfitting-ის ნიშანია. `regularized` კონფიგი val_auc=0.8918-ით და gap=0.0236-ით ბევრად უფრო სტაბილური generalization-ს ავლენს. **Final registered model: `regularized` XGBoost Pipeline.**
+### Underfit / Overfit ანალიზი
+ყველა მოდელისთვის მიზანმიმართულად underfit და overfit კონფიგურაციები გავტესტე. ეს ადასტურებს, რომ tuning-ი სწორ სივრცეში ხდება. ასევე, ეს experiment-ები ქმნის data-driven narrative-ს preprocessing-ის ეფექტების შესახებ. 
 
-### Logistic Regression — Linear Baseline
+**XGBoost — underfit → tuned → overfit:**
+deeper_overfit მოდელი (max_depth=8, min_child_weight=1) ყველაზე მაღალ raw val AUC-ს (0.9018) იძლევა, მაგრამ gap=0.0873 - training data-ს ზეპირად დაისწავლა. Kaggle-ზე private leaderboard-ზე ეს მოდელი ახალ pattern-ებს ვერ დაიჭერს. regularized კონფიგი (n_estimators=250, max_depth=4, min_child_weight=5, reg_alpha=0.1, reg_lambda=2.0) val_auc=0.8918, gap=0.0236 — ეს ბევრად სტაბილური generalization-ია.
 
-| Config | Train AUC | Val AUC | Gap |
-|--------|-----------|---------|-----|
-| Underfit (C=0.0001) | 0.8632 | 0.8304 | 0.0328 |
-| Overfit check (C=1000) | 0.8738 | 0.8305 | 0.0433 |
-| Tuned C=0.1 (best) | 0.8733 | 0.8311 | 0.0422 |
+**Logistic Regression — C (inverse regularization) ეფექტი:**
+| C | Train AUC | Val AUC | Gap | შეფასება |
+|---|-----------|---------|-----|----------|
+| 0.0001 (strong regularization) | 0.8632 | 0.8304 | 0.0328 | underfit |
+| **0.1 (tuned)** | **0.8733** | **0.8311** | **0.0422** | ✓ საუკეთესო |
+| 1000 (weak regularization) | 0.8738 | 0.8305 | 0.0433 | marginally worse |
 
-Logistic Regression მოსალოდნელად სუსტია ამ dataset-ზე — IEEE-CIS-ის V*, C*, D* feature-ები strongly non-linear interaction-ებს შეიცავს, რომელსაც linear მოდელი ვერ დაიჭერს.
+საინტერესო დაკვირვება: C=1000-ზე (minimal regularization) gap=0.0433 — მხოლოდ 0.011-ით მეტია ვიდრე C=0.1. ეს ნიშნავს, რომ Logistic Regression-ს "capacity ceiling" აქვს — მას შეუძლია 395 feature-ის წრფივი კომბინაცია, მაგრამ V*, C*, D* feature-ების non-linear interactions-ს ვერ სწავლობს.
 
-### Time-based Cross Validation (XGBoost)
+### Hyperparameter Tuning — გამოყენებული სტრატეგიები
 
-`TimeSeriesSplit(n_splits=3)` — სრული training set-ზე:
+ყველა მოდელისთვის manual grid search გამოვიყენე. ავტომატური optimization (Optuna, Hyperopt) არ გამომიყენებია manual search უფრო ნათლად ასახავს თითოეული პარამეტრის ეფექტს.
 
-| Fold | Train AUC | Val AUC |
-|------|-----------|---------|
-| 1 | 0.9345 | 0.8782 |
-| 2 | 0.9191 | 0.8864 |
-| 3 | 0.9096 | 0.8877 |
-| **Mean** | — | **0.8841** |
-| **Std** | — | **0.0042** |
+- **XGBoost:** `max_depth` (4–8), `min_child_weight` (1–10), `reg_alpha` (0–0.5), `reg_lambda` (1–5) — სულ ~10 run
+- **Random Forest:** `max_depth` (10, 15, 20), `min_samples_leaf` (10, 50) — 6 run, დამატებით underfit/overfit
+- **LightGBM:** `num_leaves` (31, 63, 127), `min_child_samples` (20, 100), `reg_lambda` (0, 1) — 12 run. early stopping n_estimators-ს თვითონ ირჩევს val set-ზე, ამიტომ n_estimators ცალკე არ ოპტიმიზირდება
+- **Decision Tree:** `max_depth` (5–20), `min_samples_leaf` (10–200) — 12 run
 
-CV std=0.0042 — სტაბილური მოდელი. Fold 1-ის მაღალი train AUC (0.9345) fold size-ის განსხვავებით აიხსნება.
-
----
-
-## MLflow Tracking
-
-**DagsHub Experiments:** [ejoba22/IEEE-CIS-Fraud-Detection MLflow](https://dagshub.com/ejoba22/IEEE-CIS-Fraud-Detection.mlflow)
-
-### Experiment სტრუქტურა
-
-```
-XGBoost_Training/
-  ├── XGBoost_Cleaning_threshold_50pct
-  ├── XGBoost_Cleaning_threshold_75pct
-  ├── XGBoost_Cleaning_threshold_90pct
-  ├── XGBoost_Feature_Engineering_baseline
-  ├── XGBoost_Feature_Engineering_time_amount
-  ├── XGBoost_Feature_Engineering_time_amount_freq
-  ├── XGBoost_Feature_Selection_all_features
-  ├── XGBoost_Feature_Selection_top_100_importance
-  ├── XGBoost_Feature_Selection_top_200_importance
-  ├── XGBoost_Feature_Selection_top_300_importance
-  ├── XGBoost_CrossValidation_TimeSeriesSplit
-  ├── XGBoost_Training_baseline
-  ├── XGBoost_Training_regularized
-  ├── XGBoost_Training_deeper_overfit_check
-  ├── XGBoost_Training_shallow_underfit_check
-  └── XGBoost_Final_Pipeline_Register
-
-LogisticRegression_Training/
-  ├── LogisticRegression_Cleaning
-  ├── LogisticRegression_Feature_Engineering
-  ├── LogisticRegression_Feature_Selection
-  ├── LogisticRegression_Training_underfit_strong_regularization
-  ├── LogisticRegression_Training_weak_regularization_overfit_check
-  ├── LogisticRegression_Training_tuned_C0.01
-  ├── LogisticRegression_Training_tuned_C0.1
-  ├── LogisticRegression_Training_tuned_C1.0
-  ├── LogisticRegression_Training_tuned_C10.0
-  ├── LogisticRegression_CrossValidation
-  └── LogisticRegression_Final_Pipeline_Register
-
-RandomForest_Training/
-  ├── RandomForest_Cleaning
-  ├── RandomForest_Feature_Engineering
-  ├── RandomForest_Feature_Selection
-  ├── RandomForest_Training_underfit_depth3
-  ├── RandomForest_Training_overfit_depth_none
-  ├── RandomForest_Training_depth10_leaf10
-  ├── RandomForest_Training_depth10_leaf50
-  ├── RandomForest_Training_depth15_leaf10
-  ├── RandomForest_Training_depth15_leaf50
-  ├── RandomForest_Training_depth20_leaf10
-  ├── RandomForest_Training_depth20_leaf50
-  ├── RandomForest_CrossValidation
-  └── RandomForest_Final_Pipeline_Register
-
-LightGBM_Training/
-  ├── LightGBM_Cleaning
-  ├── LightGBM_Feature_Engineering_baseline
-  ├── LightGBM_Feature_Engineering_time_amount
-  ├── LightGBM_Feature_Engineering_time_amount_lgbm
-  ├── LightGBM_Feature_Selection_all_features
-  ├── LightGBM_Feature_Selection_variance_only
-  ├── LightGBM_Feature_Selection_importance_10pct
-  ├── LightGBM_Feature_Selection_importance_20pct
-  ├── LightGBM_Training_underfit
-  ├── LightGBM_Training_overfit
-  ├── LightGBM_Training_leaves31_child20_l20.0
-  ├── LightGBM_Training_leaves31_child20_l21.0
-  ├── ... (12 tuning runs total)
-  ├── LightGBM_CrossValidation
-  └── LightGBM_Final_Pipeline_Register
-```
-
-### ჩაწერილი მეტრიკები
-
-| მეტრიკა | აღწერა |
-|---------|--------|
-| `train_auc` | Training set-ზე ROC-AUC |
-| `val_auc` | Validation set-ზე ROC-AUC (time-based split) |
-| `overfit_gap` | train_auc − val_auc |
-| `selection_score` | val_auc − penalty(gap > 0.05 × 0.25) |
-| `cv_mean_auc` | TimeSeriesSplit cross-validation mean AUC |
-| `cv_std_auc` | TimeSeriesSplit cross-validation std AUC |
-
-### Model Registry
-
-| Registry Name | Architecture | Val AUC |
-|--------------|-------------|---------|
-| `IEEE_CIS_LightGBM_Best` | LightGBM Pipeline | TBD after run |
-| `IEEE_CIS_XGBoost_Best` | XGBoost Pipeline (regularized) | 0.8918 |
-| `IEEE_CIS_RandomForest_Best` | Random Forest Pipeline | TBD after run |
-| `IEEE_CIS_LogisticRegression_Best` | Logistic Regression Pipeline | 0.8317 |
-
-**საუკეთესო მოდელი:** `model_inference.ipynb`-ში ყველა registered model-ის შედეგები შეედარება და საუკეთესო val AUC-ის მქონე Pipeline Registry-დან ჩამოიტვირთება, **სრულ training set-ზე** გადაიწვრთნება და test set-ზე prediction-ს გააკეთებს Kaggle submission-ისთვის.
+### Cross-Validation
+ყველა მოდელისთვის TimeSeriesSplit cross-validation ჩავატარე. ეს Kaggle-ის standard k-fold-ზე უკეთესია fraud detection-ისთვის — k-fold-ი ისტორიული მონაცემებით "მომავალს ისწავლის", რაც data leakage-ია. TimeSeriesSplit-ი ყოველთვის წარსულ ინფორმაციაზე ასწავლის და მომავალ fold-ზე ახდენს ვალიდაციას.
