@@ -19,9 +19,11 @@
 
 IEEE-CIS-Fraud-Detection:
 - eda-and-observations.ipynb: მონაცემთა წინასწარი ანალიზი, ვიზუალიზაცია და კორელაციების დადგენა
-- model_experiment_XGBoost.ipynb      # XGBoost ექსპერიმენტები
-- model_experiment_LogisticRegression.ipynb  # Logistic Regression ექსპერიმენტები
-- model_inference.ipynb               # საუკეთესო მოდელის inference + submission
+- model_experiment_LightGBM.ipynb          # LightGBM ექსპერიმენტები
+- model_experiment_xgboost.ipynb           # XGBoost ექსპერიმენტები
+- model_experiment_random_forest.ipynb     # Random Forest ექსპერიმენტები
+- model_experiment_logistic_regression.ipynb  # Logistic Regression ექსპერიმენტები
+- model_inference.ipynb                    # საუკეთესო მოდელის inference + submission
 
 
 ## EDA ძირითადი დაკვირვებები
@@ -50,7 +52,7 @@ email domain, ProductCD, DeviceType - fraud rate-ის მიხედვით
 
 ## Feature Engineering
 EDA-ს დაკვირვებებზე დაყრდნობით შევქმენით სხვადასხვა კატეგორიის ნიშნები
-კატეგორიული ცვლადების კოდირებისთვის სხვადასხვა მოდელში განსხვავებული მიდგომა გამოვიყენეთ, რადგან ერთი მეთოდი ყველა არქიტექტურისთვის ოპტიმალური არ არის. Logistic Regression-ში Label Encoding გამოვიყენე One-Hot Encoding-ის ნაცვლად მეხსიერების დაზოგვის მიზნით, ვინაიდან ზოგიერთ კატეგორიულ ნიშანს 50-ზე მეტი უნიკალური მნიშვნელობა ჰქონდა და OHE dimension explosion-ს გამოიწვევდა. LightGBM-ში კატეგორიული ნიშნები native categorical-ად მიეცა, რაც ამ ფრეიმვორქის მთავარი უპირატესობაა — ის კარგად ამუშავებს კატეგორიულ ცვლადებს OHE-ს გარეშე. XGBoost-სა და Random Forest-ში Ordinal Encoding გამოვიყენე.
+კატეგორიული ცვლადების კოდირებისთვის სხვადასხვა მოდელში განსხვავებული მიდგომა გამოვიყენეთ, რადგან ერთი მეთოდი ყველა არქიტექტურისთვის ოპტიმალური არ არის. Logistic Regression-ში Label Encoding გამოვიყენე One-Hot Encoding-ის ნაცვლად მეხსიერების დაზოგვის მიზნით, ვინაიდან ზოგიერთ კატეგორიულ ნიშანს 50-ზე მეტი უნიკალური მნიშვნელობა ჰქონდა და OHE dimension explosion-ს გამოიწვევდა. XGBoost-სა და Random Forest-ში Ordinal Encoding გამოვიყენე, სადაც უცნობი კატეგორიები -1-ად ენიჭება.
 
 ### კატეგორიული ცვლადების გადაყვანა
 Label Encoding: გამოყენებულ იქნა კატეგორიული ცვლადებისთვის (მაგ: ProductCD, card4, card6)
@@ -146,9 +148,9 @@ Manual grid search: სხვადასხვა `max_depth`, `learning_rate`,
 
 | Config | Train AUC | Val AUC | Gap |
 |--------|-----------|---------|-----|
-| Underfit (C=0.0001) | ~0.78 | ~0.77 | ~0.01 |
-| Overfit check (C=1000) | ~0.82 | ~0.81 | ~0.01 |
-| Tuned (best C) | ~0.82 | ~0.81 | ~0.01 |
+| Underfit (C=0.0001) | 0.8632 | 0.8304 | 0.0328 |
+| Overfit check (C=1000) | 0.8738 | 0.8305 | 0.0433 |
+| Tuned C=0.1 (best) | 0.8733 | 0.8311 | 0.0422 |
 
 Logistic Regression მოსალოდნელად სუსტია ამ dataset-ზე — IEEE-CIS-ის V*, C*, D* feature-ები strongly non-linear interaction-ებს შეიცავს, რომელსაც linear მოდელი ვერ დაიჭერს.
 
@@ -203,7 +205,40 @@ LogisticRegression_Training/
   ├── LogisticRegression_Training_tuned_C0.1
   ├── LogisticRegression_Training_tuned_C1.0
   ├── LogisticRegression_Training_tuned_C10.0
+  ├── LogisticRegression_CrossValidation
   └── LogisticRegression_Final_Pipeline_Register
+
+RandomForest_Training/
+  ├── RandomForest_Cleaning
+  ├── RandomForest_Feature_Engineering
+  ├── RandomForest_Feature_Selection
+  ├── RandomForest_Training_underfit_depth3
+  ├── RandomForest_Training_overfit_depth_none
+  ├── RandomForest_Training_depth10_leaf10
+  ├── RandomForest_Training_depth10_leaf50
+  ├── RandomForest_Training_depth15_leaf10
+  ├── RandomForest_Training_depth15_leaf50
+  ├── RandomForest_Training_depth20_leaf10
+  ├── RandomForest_Training_depth20_leaf50
+  ├── RandomForest_CrossValidation
+  └── RandomForest_Final_Pipeline_Register
+
+LightGBM_Training/
+  ├── LightGBM_Cleaning
+  ├── LightGBM_Feature_Engineering_baseline
+  ├── LightGBM_Feature_Engineering_time_amount
+  ├── LightGBM_Feature_Engineering_time_amount_lgbm
+  ├── LightGBM_Feature_Selection_all_features
+  ├── LightGBM_Feature_Selection_variance_only
+  ├── LightGBM_Feature_Selection_importance_10pct
+  ├── LightGBM_Feature_Selection_importance_20pct
+  ├── LightGBM_Training_underfit
+  ├── LightGBM_Training_overfit
+  ├── LightGBM_Training_leaves31_child20_l20.0
+  ├── LightGBM_Training_leaves31_child20_l21.0
+  ├── ... (12 tuning runs total)
+  ├── LightGBM_CrossValidation
+  └── LightGBM_Final_Pipeline_Register
 ```
 
 ### ჩაწერილი მეტრიკები
@@ -221,7 +256,9 @@ LogisticRegression_Training/
 
 | Registry Name | Architecture | Val AUC |
 |--------------|-------------|---------|
+| `IEEE_CIS_LightGBM_Best` | LightGBM Pipeline | TBD after run |
 | `IEEE_CIS_XGBoost_Best` | XGBoost Pipeline (regularized) | 0.8918 |
-| `IEEE_CIS_LogisticRegression_Best` | Logistic Regression Pipeline | ~0.81 |
+| `IEEE_CIS_RandomForest_Best` | Random Forest Pipeline | TBD after run |
+| `IEEE_CIS_LogisticRegression_Best` | Logistic Regression Pipeline | 0.8317 |
 
-**საუკეთესო მოდელი:** `IEEE_CIS_XGBoost_Best` — `model_inference.ipynb`-ში Registry-დან ჩამოიტვირთება, **სრულ training set-ზე** გადაიწვრთნება და test set-ზე prediction-ს გააკეთებს Kaggle submission-ისთვის.
+**საუკეთესო მოდელი:** `model_inference.ipynb`-ში ყველა registered model-ის შედეგები შეედარება და საუკეთესო val AUC-ის მქონე Pipeline Registry-დან ჩამოიტვირთება, **სრულ training set-ზე** გადაიწვრთნება და test set-ზე prediction-ს გააკეთებს Kaggle submission-ისთვის.
