@@ -165,3 +165,15 @@ deeper_overfit მოდელი (max_depth=8, min_child_weight=1) ყველ
 
 ### Cross-Validation
 ყველა მოდელისთვის TimeSeriesSplit cross-validation ჩავატარე. ეს Kaggle-ის standard k-fold-ზე უკეთესია fraud detection-ისთვის — k-fold-ი ისტორიული მონაცემებით "მომავალს ისწავლის", რაც data leakage-ია. TimeSeriesSplit-ი ყოველთვის წარსულ ინფორმაციაზე ასწავლის და მომავალ fold-ზე ახდენს ვალიდაციას.
+
+# საბოლოო მოდელის შერჩევა
+
+`model_inference.ipynb` ავტომატურად ადარებს ყველა registered model-ს MLflow Registry-დან. გამარჯვებული ყველაზე მაღალი val AUC-ით შეირჩევა (gap > 0.05 penalty-ს გამოიწვევს). შემდეგ სრულ training set-ზე (train + val გაერთიანება) დავატრენინგე ეს ~20%-ით მეტ data-ს ნიშნავს Kaggle submission-ისთვის.
+
+<img src="images/model_comparison.png" width="400"/>
+
+## MLflow Tracking
+ექსპერიმენტების ბმული
+https://dagshub.com/ejoba22/IEEE-CIS-Fraud-Detection
+
+MLflow-ში ყველა მოდელის არქიტექტურა ცალკე experiment-ადაა ორგანიზებული. თითოეული experiment-ის შიგნით run-ები pipeline-ის ეტაპებს შეესაბამება: cleaning, feature engineering, feature selection, training, cross-validation, final pipeline. ეს სტრუქტურა ნებისმიერ გადაწყვეტილებას ასახავს - რატომ შეირჩა ეს threshold, ეს feature set, ეს hyperparameter.
